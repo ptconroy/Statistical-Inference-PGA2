@@ -1,0 +1,76 @@
+---
+title: "Simulation of Exponential Distribution and Central Limit Theroem"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+
+This document investigates the exponential distribution in R and compares it with the the Central Limit Theorem. Both the mean and the standard deviation of the exponential distribution is 1/lambda. While the exponential distribution is not normal, the distribution of means sampled from the exponential distribution should approximate normal under the central limit theorem.
+
+### Constructing the Simulation
+
+We construct a vector of 1000 samples from the exponential distribution and 1000 means of 40 samples from the exponential distribution. All samples are "random", and the seed is set for reproduceability. Lambda, as a parameter of the exponential distribution, is given as 0.2, setting both the theoretical mean and standard distribution of the population equal to 5.
+
+```{r simulation}
+set.seed(1)
+lambda <- 0.2 # The exponentials should have mean and stdev of 5.
+orig <- rexp(1000, lambda)
+sampv <- NULL # sampv will hold the sampled means.
+for (i in 1:1000) sampv <- c(sampv, mean(rexp(40, lambda)))
+```
+
+### Analyzing the Distributions
+
+Now, we look at the distributions. Comparing the the theoretical and sampled statistics of mean and variance is trivial.
+```{r simresults}
+cat("The theoretical mean of the exponential distribution is", 1/lambda,
+    "and the observed mean is", mean(orig), ".")
+library(ggplot2)
+library(gridExtra)
+orighist <- ggplot(as.data.frame(orig), aes(x = orig)) + 
+    ggtitle("One Thousand Observations from Exponential Distribution") +
+    theme(legend.title=element_blank()) +
+    geom_histogram(binwidth = 2, center = 1) +
+    geom_vline(aes(xintercept = mean(orig), col = "Actual Mean"))  +
+    geom_vline(aes(xintercept = 5, col = "Theoretical Mean"))
+samphist <- ggplot(as.data.frame(sampv), aes(x = sampv)) +
+    ggtitle("One Thousand Means of Forty Exponentials") +
+    theme(legend.title=element_blank()) +
+    geom_histogram(binwidth = 0.2) +
+    geom_vline(aes(xintercept = mean(sampv), col = "Sample Mean")) +
+    geom_vline(aes(xintercept = 5, col = "Theoretical Mean"))
+grid.arrange(orighist, samphist, ncol = 1)
+
+cat("The theoretical variance of the exponential distribution is", (1/lambda)^2,
+    "and the observed variance is", var(orig), ".")
+mean(sampv) # by the CLT, should be 5.
+cat("The theoretical S.E. is", sd(orig)/sqrt(40),
+    "and the sample S.E. is", sd(sampv), "for a difference of ",
+    sd(orig)/sqrt(40) - sd(sampv), ".")
+```
+
+
+Quite obviously, the shape of the exponential distribution is nothing like that of a normal curve. Nonetheless, as shown above, all of the descriptive statistics  (mean, variance, standard error) fall closely in line with the theory. 
+
+## Normality
+
+The shape of the histogram above is certainly similar to that of a normal distribution. To determine whether the distribution of the means approximates a normal distribution, I'll first run a Shapiro-Wilk normality test. In Shapiro-Wilk, the null hypothesis is normality, so a p value smaller than alpha rejects the null, i.e, the distribution is not normal. 
+
+``` {r shapiro}
+shapiro.test(sampv)$p.value
+```
+
+Such a small p value call for a rejection of the null hypothesis. In other words, the distribution is not normal. The question however, is whether the distribution approximates a normal distribution. To answer this question, we use a Q-Q plot. This plot (below) shows close correspondance between the sample means and the theoretical values with some small deviations at the extremes of the distribution. The overall linearity of the plot is evidence of the normality of the distribution, at least within approximately two standard deviations of the mean.
+
+``` {r qqplot}
+qqnorm(sampv)
+qqline(sampv)
+```
+
+## Conclusion
+
+While the exponential distribution is not normal, the distribution of means taken from the exponential distribution does approximate a normal distribution, as predicted by the central limit theorem. We would expect as sample sizes increase from 40 to much larger numbers, for the distribution of the means to approach normality.

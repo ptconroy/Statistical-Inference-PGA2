@@ -1,0 +1,78 @@
+---
+title: "Effect of Vitamin C Delivery and Dosage upon Guinea Pig Odontoblast Growth"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+###Synopsis
+This document explores the tooth growth data included in R, including a summarization of the data, and examining the relationship between vitamin C and odontoblast growth in guinea pigs with two delivery mechanisms and at three dosages.
+
+```{r prelim, results='hide',message=FALSE,warning=FALSE}
+data("ToothGrowth")
+library(ggplot2)
+library(dplyr)
+```
+
+### Summary of the Data
+
+The ToothGrowth data measures the length of ondontoblasts (cells responsible for tooth growth) in sixty guinea pigs under two different delivery mechanisms for vitamin C (orange juice or ascorbic acid solution), and at three different doses (0.5, 1, & 2 mg/day). We assume that the data are normally distributed (enabling use of a T-Test), although we perform some checks of that assumption.
+
+The data are in a data.frame where each row is an observation, and each column represents the length of measured growth, the type of supplement, and the dosage given to each guinnea pig.
+
+### Exploring the Data
+
+The box plots below show the relationship of observed length to the dose and type of supplement. Orange Juice is labed "OJ", and ascorbic acid is labeled "VC".
+
+
+```{r explore2, fig.height=2.5}
+modTooth <- mutate(ToothGrowth, facDose = as.factor(dose))
+modTooth <- modTooth %>% group_by(supp, facDose) %>%
+    mutate(median = median(len), mean = mean(len))
+ggplot(modTooth, aes(x = supp, y = len)) + geom_boxplot() +
+    facet_grid(. ~ facDose)
+```
+Visually, it appears that length increases with dosage for both supplements. It also appears that orange juice is associated with greater length than ascorbic acid, except at the 2.0mg/day dosage.
+
+
+## Analysis
+
+We hypothesize that the mean of the length changes with the dose, and that there is a difference between the mean measured for orange juice and for ascorbic acid at the two lower dosages. The null hypothesis would be that there is no difference between the two supplements, nor is there a difference between the dosages.
+
+To demonstrate our hypothesis, we would like to use Student's T-Test to determine whether the apparent relationships illustrated in the box plot above are unlikely to have been found by chance. However, the T-Test assumes that the observations come from an approximately normal population. To check that foundation, we use the Sapiro Wick test for normality. A p value from this test greater than alpha (which I arbitrarily set to .05) means that we cannot reject the null hypothesis of the test: the samples come from a normal population.
+
+``` {r shapiro}
+summarise(modTooth, shapiro.wick.test.p.value = shapiro.test(len)$p.value)
+```
+
+The p values of the Shapiro Wick test is sufficiently high for all doses and supplements that we cannot reject the null, and the samples appear to come from a normal distribution, or at least sufficiently to use a T-Test to compare the test groups. We run the T-Tests below. Because we doing multiple comparisons, we adjust the p values from the T-Tests using the Benjamini & Hochberg correction.
+
+```{r t.tests}
+# for ease of reading, subset the data
+OJ05 <- ToothGrowth[ToothGrowth$supp == "OJ" & ToothGrowth$dose == 0.5,]
+OJ10 <- ToothGrowth[ToothGrowth$supp == "OJ" & ToothGrowth$dose == 1.0,]
+OJ20 <- ToothGrowth[ToothGrowth$supp == "OJ" & ToothGrowth$dose == 2.0,]
+VC05 <- ToothGrowth[ToothGrowth$supp == "VC" & ToothGrowth$dose == 0.5,]
+VC10 <- ToothGrowth[ToothGrowth$supp == "VC" & ToothGrowth$dose == 1.0,]
+VC20 <- ToothGrowth[ToothGrowth$supp == "VC" & ToothGrowth$dose == 2.0,]
+comp05 <- t.test(OJ05$len, VC05$len) # 0.5 dose, OJ vs. VC
+comp10 <- t.test(OJ10$len, VC10$len) # 1.0 dose, OJ vs. VC
+comp20 <- t.test(OJ20$len, VC20$len) # 2.0 dose, OJ vs. VC
+p.valuesSupp <- c(comp05$p.value, comp10$p.value, comp20$p.value)
+p.adjust(p.valuesSupp, method = "BH")
+compOJlowdose <- t.test(OJ05$len, OJ10$len) # OJ, .5 vs. 1.0
+compOJhighdose <- t.test(OJ10$len, OJ20$len) # OJ, 1.0 vs. 2.0
+compVClowdose <- t.test(VC05$len, VC10$len) # VC, .5 vs. 1.0
+compVChighdose <- t.test(VC10$len, VC20$len) # VC, 1.0 vs. 2.0
+p.valuesDose <- c(compOJlowdose$p.value, compOJhighdose$p.value, compVClowdose$p.value,
+              compVChighdose$p.value)
+p.adjust(p.valuesDose, method = "BH")
+```
+## Discussion
+
+The adjusted p values for the difference between orange juice and ascorbic acid at 0.5 and 1.0 mg/day are below alpha (0.5). The p value at 2.0 mg/day is too high to suggest a difference at that dose. All of the adjusted p values for the difference between doses for each supplement fall below my alpha of 0.5, making those differences significant. 
+
+## Conclusion
+1. We find a difference in length between doses of 0.5, 1.0 and 2.0 mg/day for both ascorbic acid and orange juice, with the data suggesting increasing dosage increases length.
+2. We find a difference in length between ascorbic acid and orange juice at the 0.5mg/day and 1.0 mg/day dose, with orange juice having greater lengths than ascorbic acid. We have no evidence of a difference between the two supplements at 2.0 mg/day.
